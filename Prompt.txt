@@ -1,0 +1,26 @@
+Hola ChatGPT, quiero hacer lo siguiente:
+A partir de datos de una PCR cuantitativa quiero calcular ratios en las cantidades obtenidas (Quantity).
+Tengo archivos de tipo .xls en el que las primeras 7 filas son información inecesaria del experimento de PCR.
+Luego tengo diferentes columnas: "Well	Sample Name	Target Name	Task	Reporter	Quencher	Cт	Cт Mean	Cт SD	Quantity	Quantity Mean	Quantity SD	Automatic Ct Threshold	Ct Threshold	Automatic Baseline	Baseline Start	Baseline End	Comments	HIGHSD	NOAMP	OUTLIERRG".
+Quiero, de cada muestra que hagas el ratio entre el Target Name que sea y su correspondiente ABL1 (siempre todos los pacientes van a tener ABL1). 
+Cada paciente está por triplicado por lo que la Quantity final será la Quantity Mean que ya es la media de los pocillos.
+Habrá pacientes (Sample Names) que tengan varios Target Name, por ejemplo un paciente 99999 puede tener p210 y p190 y quiero el ratio de los 2 por ABL1.
+Los verdaderos pacientes salen en las filas con Task UNKNOWN.
+Quiero que me lo muestres en una tabla resumen.
+Quiero que si no tiene Quantity o Quantity Mean porque el Cт es Undetermined para ese Target Name me lo indiques como "NEGATIVO" además del ratio.
+También quiero que si sólo hay una casilla positiva de 3 para un target name de un paciente me lo indiques poniendo que debería revisarlo.
+Luego, el ratio quiero que me lo multipliques por 100 o por 10000, pero que me dejes a mí por qué número quiero multiplicarlo entre esos dos números (si es posible con una lista desplegable)
+A continuación me gustaría que me dejases multiplicar cada ratio de cada paciente por un factor de conversión que introduciría yo manualmente a cada paciente. Si es posible déjamelo poner al lado del paciente en la tabla resumen.
+En la tabla resumen de ratios quiero los pacientes ordenados de menor a mayor, el target que analizas, el Quantity Mean (con 1 decimal), el ABL1 Mean (con 1 decimal) y el ratio (o 0.0000 si es negativo o el que toque con 4 decimales). 
+Luego quiero que me añadas la interpretación de cada paciente, que es la siguiente:
+- Si el ABL1 Mean tiene <10000 el resultado será "No valorable".
+- Si el ratio es de negativo, poner "Al menos MR" seguido de un número que será 4 si ABL1 Mean tiene >10000 pero <32000; 4.5 si está entre 32000 y 100000 y 5 si está superior a 100000.
+- Si el ratio es positivo, si es mayor de 0.1 debería de poner "Ausencia de MR". Si es menor de 0.1, será "MR3" si está entre 0.1 y 0.01, "MR4" si está entre 0.01 y 0.0032 y "MR4.5" si está entre 0.0032 y 0.001 y "MR5" si está por debajo de 0.001. 
+
+Además quiero que me calcules las rectas de regresión lineal con su b y su a de cada Target Name con 3 decimales. Las rectas son las filas que tienen Task STANDARD. La x es el log de Quantity y la y son los Cт. Son varios valores de Quantity duplicados todos ellos.
+Si en los Cт pone Undetermined en una de las 2 determinaciones de las parejas iguales de Quantity quiero que cojas la otra para el cálculo pero que me des un aviso de que para la determinación que es (diciéndome la Quantity que es) no había Cт en una de las 2 determinaciones.
+Los que en Task pone NTC no los tengas en cuenta que son las "aguas".
+
+Todo eso me gustaría hacerlo (que creo que es la mejor forma) con python y streamlit, aunque si consideras que es mejor de otra forma dímelo.
+
+Dame el archivo .py para poder ejecutarlo en local.
