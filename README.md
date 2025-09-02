@@ -49,7 +49,7 @@ PCR_Analyzer/
 1. Clonar el repositorio:
 
 ```bash
-git clone https://github.com/TU_USUARIO/PCR_Analyzer.git
+git clone https://github.com/GenDoc94/PCR_Analyser.git
 cd PCR_Analyzer
 ```
 
