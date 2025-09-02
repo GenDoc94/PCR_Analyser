@@ -1,4 +1,4 @@
-# pcr_ratio_streamlit_final.py
+# pcr_analyser.py
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -26,7 +26,7 @@ if uploaded_file:
     # Calcular rectas de regresión y factores de conversión por par
     regression_dict = {}
     pair_factors_dict = {}  # Target -> lista de dicts {Quantity, Factor}
-    st.subheader("Curvas estándar y rectas de regresión")
+    st.subheader("Rectas de regresión")
     
     for target in df_standard["Target Name"].unique():
         t_df = df_standard[df_standard["Target Name"]==target]
@@ -135,7 +135,7 @@ if uploaded_file:
             })
     
     summary_df = pd.DataFrame(summary_list).sort_values("Ratio")
-    st.subheader("Tabla Resumen Final con Factor de Conversión Correcto")
+    st.subheader("Tabla Resumen")
     st.dataframe(summary_df)
     
     # Descargar Excel
