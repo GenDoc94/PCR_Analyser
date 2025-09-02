@@ -1,0 +1,1 @@
+web: streamlit run pcr_ratio_streamlit_final.py
