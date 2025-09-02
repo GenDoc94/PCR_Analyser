@@ -5,8 +5,8 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-st.set_page_config(page_title="PCR Ratio Analyzer Final", layout="wide")
-st.title("PCR Quantitative Ratio Analyzer with Correct Conversion Factors")
+st.set_page_config(page_title="PCR Analyzer", layout="wide")
+st.title("PCR Analyzer")
 
 uploaded_file = st.file_uploader("Sube tu archivo .xls", type=["xls","xlsx"])
 multiplicador = st.selectbox("Multiplicar ratio por:", [100, 10000])
@@ -63,20 +63,7 @@ if uploaded_file:
             pair_factors_dict[target] = pair_factors
             st.write(f"{target}: Ct = {a:.3f}*log10(Quantity) + {b:.3f}")
     
-    # Graficar curvas estándar
-    fig, ax = plt.subplots(figsize=(8,6))
-    for target, reg in regression_dict.items():
-        x_plot = np.linspace(min(reg["x_vals"]), max(reg["x_vals"]), 100)
-        y_plot = reg["a"]*x_plot + reg["b"]
-        ax.plot(x_plot, y_plot, label=f"{target} (fit)")
-        ax.scatter(reg["x_vals"], reg["y_vals"], s=50)
-    ax.set_xlabel("log10(Quantity)")
-    ax.set_ylabel("Ct")
-    ax.set_title("Curvas patrón de cada Target")
-    ax.legend()
-    st.pyplot(fig)
-    
-    # Tabla resumen con ratios y factor de conversión
+# Tabla resumen con ratios y factor de conversión
     summary_list = []
     for patient in df_patients["Sample Name"].unique():
         patient_df = df_patients[df_patients["Sample Name"]==patient]
@@ -156,3 +143,18 @@ if uploaded_file:
     summary_df.to_excel(towrite, index=False, engine='openpyxl')
     towrite.seek(0)
     st.download_button(label="Descargar tabla resumen", data=towrite, file_name="tabla_resumen_final.xlsx", mime="application/vnd.ms-excel")
+
+    # Graficar curvas estándar
+    fig, ax = plt.subplots(figsize=(8,6))
+    for target, reg in regression_dict.items():
+        x_plot = np.linspace(min(reg["x_vals"]), max(reg["x_vals"]), 100)
+        y_plot = reg["a"]*x_plot + reg["b"]
+        ax.plot(x_plot, y_plot, label=f"{target} (fit)")
+        ax.scatter(reg["x_vals"], reg["y_vals"], s=50)
+    ax.set_xlabel("log10(Quantity)")
+    ax.set_ylabel("Ct")
+    ax.set_title("Curvas patrón de cada Target")
+    ax.legend()
+    st.pyplot(fig)
+    
+    
