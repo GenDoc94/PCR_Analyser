@@ -1,1 +1,1 @@
-web: streamlit run pcr_ratio_streamlit_final.py
+web: streamlit run pcr_ratio_streamlit_final.py --server.port=$PORT --server.address=0.0.0.0
