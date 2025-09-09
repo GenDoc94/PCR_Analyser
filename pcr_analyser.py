@@ -156,5 +156,16 @@ if uploaded_file:
     ax.set_title("Curvas patrón de cada Target")
     ax.legend()
     st.pyplot(fig)
-    
+
+st.markdown(
+    """
+    <div style='text-align: center; font-size: 12px;'>
+        Created by <a href="https://github.com/GenDoc94" target="_blank">GenDoc94</a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.image("logo_hem.png", width=50)
+
     
