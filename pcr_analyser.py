@@ -157,15 +157,27 @@ if uploaded_file:
     ax.legend()
     st.pyplot(fig)
 
+
+#Created by...
 st.markdown(
     """
     <div style='text-align: center; font-size: 12px;'>
-        Created by <a href="https://github.com/GenDoc94" target="_blank">GenDoc94</a>
+        Created by 
+        <a href="https://github.com/GenDoc94" target="_blank" style="text-decoration: none; color: inherit;">
+            GenDoc94
+            <img src="https://raw.githubusercontent.com/GenDoc94/PCR_Analyser/main/logo_hem.png"
+                 style="height: 1em; vertical-align: middle; margin-left: 4px;"/>
+        </a>
+        &nbsp;|&nbsp;
+        <a href="https://buymeacoffee.com/gendoc94" target="_blank" style="text-decoration: none; color: inherit;">
+            Buy me a coffee
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+                 style="height: 1em; vertical-align: middle; margin-left: 4px;"/>
+        </a>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-st.image("logo_hem.png", width=50)
 
     
