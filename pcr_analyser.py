@@ -6,7 +6,12 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 
 st.set_page_config(page_title="PCR Analyzer", layout="wide")
-st.title("PCR Analyzer")
+
+# Título centrado
+st.markdown(
+    "<h1 style='text-align: center;'>PCR Analyzer</h1>",
+    unsafe_allow_html=True
+)
 
 uploaded_file = st.file_uploader("Sube tu archivo .xls", type=["xls","xlsx"])
 multiplicador = st.selectbox("Multiplicar ratio por:", [100, 10000])
@@ -23,9 +28,9 @@ if uploaded_file:
     df_standard["Quantity"] = pd.to_numeric(df_standard["Quantity"], errors='coerce')
     df_standard["Cт"] = pd.to_numeric(df_standard["Cт"], errors='coerce')
     
-    # Calcular rectas de regresión y factores de conversión por par
+    # Calcular rectas de regresión y factores de conversión
     regression_dict = {}
-    pair_factors_dict = {}  # Target -> lista de dicts {Quantity, Factor}
+    pair_factors_dict = {}
     st.subheader("Rectas de regresión")
     
     for target in df_standard["Target Name"].unique():
@@ -37,10 +42,8 @@ if uploaded_file:
         for qty, group in grouped:
             ct_vals = group["Cт"].dropna().values
             if len(ct_vals) == 0:
-                st.warning(f"{target}, Quantity {qty}: Ningún Ct disponible para la pareja")
                 continue
             elif len(ct_vals) == 1:
-                st.warning(f"{target}, Quantity {qty}: Sólo un Ct disponible, otro 'Undetermined'")
                 x_vals.append(np.log10(qty))
                 y_vals.append(ct_vals[0])
                 pair_factors.append({"Quantity": qty, "Ct_pair": ct_vals})
@@ -53,17 +56,36 @@ if uploaded_file:
             a, b = np.polyfit(x_vals, y_vals, 1)
             regression_dict[target] = {"a": a, "b": b, "x_vals": x_vals, "y_vals": y_vals}
             
-            # Calcular factor de conversión real por par usando la recta
             for pf in pair_factors:
                 ct_pair = pf["Ct_pair"]
                 expected_qties = [10**((ct - b)/a) for ct in ct_pair]
-                pf["Factor"] = pf["Quantity"] / np.mean(expected_qties)
+                pf["Factor"] = round(pf["Quantity"] / np.mean(expected_qties), 2)
                 pf.pop("Ct_pair")
             pair_factors_dict[target] = pair_factors
             st.write(f"{target}: Ct = {a:.3f}*log10(Quantity) + {b:.3f}")
     
     # ==========================
-    # TABLA 1: cálculo con Quantity
+    # NUEVO: mostrar factores de conversión en varias columnas
+    # ==========================
+    st.subheader("Factores de conversión")
+    targets = list(pair_factors_dict.keys())
+    for i in range(0, len(targets), 2):
+        cols = st.columns(2)
+        for j, col in enumerate(cols):
+            if i+j < len(targets):
+                target = targets[i+j]
+                pf_list = pair_factors_dict[target]
+                if pf_list:
+                    table = pd.DataFrame(pf_list)
+                    table = table.rename(columns={
+                        "Quantity": "Quantity (par)",
+                        "Factor": "Factor de Conversión"
+                    })
+                    col.markdown(f"**{target}**")
+                    col.dataframe(table)
+
+    # ==========================
+    # TABLA 1: con Quantity
     # ==========================
     summary_list = []
     for patient in df_patients["Sample Name"].unique():
@@ -77,21 +99,16 @@ if uploaded_file:
             n_positive = target_df["Quantity"].notna().sum()
             
             if n_positive == 1:
-                aviso = "Sólo 1/3 positivo"
-                extra = "Repetir"
+                aviso, extra = "Sólo 1/3 positivo", "Repetir"
             elif n_positive == 2:
-                aviso = "Sólo 2/3 positivo"
-                extra = ""
+                aviso, extra = "Sólo 2/3 positivo", ""
             else:
-                aviso = ""
-                extra = ""
+                aviso, extra = "", ""
             
-            ratio = 0.0
+            ratio, fc = 0.0, 1.0
             if quantity_mean>0 and abl1_mean>0:
                 ratio = (quantity_mean / abl1_mean) * multiplicador
             
-            # Aplicar factor de conversión
-            fc = 1.0
             if ratio>0 and target in pair_factors_dict:
                 pf_list = pair_factors_dict[target]
                 log_q_patient = np.log10(quantity_mean)
@@ -100,53 +117,42 @@ if uploaded_file:
                 fc = pf_list[idx]["Factor"]
                 ratio *= fc
             
-            # Interpretación
             if abl1_mean<10000:
                 interpretacion = "No valorable"
             elif ratio==0:
-                if abl1_mean<32000:
-                    interpretacion="Al menos MR4"
-                elif abl1_mean<100000:
-                    interpretacion="Al menos MR4.5"
-                else:
-                    interpretacion="Al menos MR5"
+                if abl1_mean<32000: interpretacion="Al menos MR4"
+                elif abl1_mean<100000: interpretacion="Al menos MR4.5"
+                else: interpretacion="Al menos MR5"
             else:
-                if ratio>0.1:
-                    interpretacion="Ausencia de MR"
-                elif 0.01<ratio<=0.1:
-                    interpretacion="MR3"
-                elif 0.0032<ratio<=0.01:
-                    interpretacion="MR4"
-                elif 0.001<ratio<=0.0032:
-                    interpretacion="MR4.5"
-                else:
-                    interpretacion="MR5"
-            if extra:
-                interpretacion += f" ({extra})"
+                if ratio>0.1: interpretacion="Ausencia de MR"
+                elif 0.01<ratio<=0.1: interpretacion="MR3"
+                elif 0.0032<ratio<=0.01: interpretacion="MR4"
+                elif 0.001<ratio<=0.0032: interpretacion="MR4.5"
+                else: interpretacion="MR5"
+            if extra: interpretacion += f" ({extra})"
             
             summary_list.append({
+                "Interpretación": interpretacion,
                 "Paciente": patient,
                 "Target": target,
                 "Quantity Mean": round(quantity_mean,1),
                 "ABL1 Mean": round(abl1_mean,1),
                 "Ratio": round(ratio,4),
-                "Factor de Conversión": round(fc,3),
-                "Aviso": aviso,
-                "Interpretación": interpretacion
+                "FC": round(fc,2),
+                "Aviso": aviso
             })
     
     summary_df = pd.DataFrame(summary_list).sort_values("Ratio")
-    st.subheader("Tabla Resumen")
+    st.subheader("Tabla Resumen (Quantity/ABL1)")
     st.dataframe(summary_df)
     
-    # Descargar Excel
     towrite = BytesIO()
     summary_df.to_excel(towrite, index=False, engine='openpyxl')
     towrite.seek(0)
-    st.download_button(label="Descargar tabla resumen", data=towrite, file_name="tabla_resumen_final.xlsx", mime="application/vnd.ms-excel")
-
+    st.download_button("Descargar tabla resumen", towrite, "tabla_resumen_final.xlsx")
+    
     # ==========================
-    # TABLA 2: cálculo con ΔCt
+    # TABLA 2: con ΔCt
     # ==========================
     summary_ct_list = []
     for patient in df_patients["Sample Name"].unique():
@@ -158,65 +164,51 @@ if uploaded_file:
         for target in targets:
             target_ct_mean = pd.to_numeric(patient_df[patient_df["Target Name"]==target]["Cт Mean"], errors='coerce').mean()
             
-            aviso = ""
-            extra = ""
+            aviso, extra = "", ""
             n_positive = patient_df[patient_df["Target Name"]==target]["Quantity"].notna().sum()
             if n_positive == 1:
-                aviso = "Sólo 1/3 positivo"
-                extra = "Repetir"
+                aviso, extra = "Sólo 1/3 positivo", "Repetir"
             elif n_positive == 2:
-                aviso = "Sólo 2/3 positivo"
+                aviso, extra = "Sólo 2/3 positivo", ""
             
-            ratio_ct = 0.0
-            delta_ct = None
+            ratio_ct, delta_ct = 0.0, None
             if pd.notna(abl1_ct_mean) and pd.notna(target_ct_mean):
                 delta_ct = abl1_ct_mean - target_ct_mean
                 ratio_ct = (2 ** delta_ct) * multiplicador
             
-            # Interpretación
             if abl1_mean < 10000:
                 interpretacion = "No valorable"
             elif ratio_ct==0:
-                if abl1_mean<32000:
-                    interpretacion="Al menos MR4"
-                elif abl1_mean<100000:
-                    interpretacion="Al menos MR4.5"
-                else:
-                    interpretacion="Al menos MR5"
+                if abl1_mean<32000: interpretacion="Al menos MR4"
+                elif abl1_mean<100000: interpretacion="Al menos MR4.5"
+                else: interpretacion="Al menos MR5"
             else:
-                if ratio_ct>0.1:
-                    interpretacion="Ausencia de MR"
-                elif 0.01<ratio_ct<=0.1:
-                    interpretacion="MR3"
-                elif 0.0032<ratio_ct<=0.01:
-                    interpretacion="MR4"
-                elif 0.001<ratio_ct<=0.0032:
-                    interpretacion="MR4.5"
-                else:
-                    interpretacion="MR5"
-            if extra:
-                interpretacion += f" ({extra})"
+                if ratio_ct>0.1: interpretacion="Ausencia de MR"
+                elif 0.01<ratio_ct<=0.1: interpretacion="MR3"
+                elif 0.0032<ratio_ct<=0.01: interpretacion="MR4"
+                elif 0.001<ratio_ct<=0.0032: interpretacion="MR4.5"
+                else: interpretacion="MR5"
+            if extra: interpretacion += f" ({extra})"
 
             summary_ct_list.append({
+                "Interpretación": interpretacion,
                 "Paciente": patient,
                 "Target": target,
                 "Ct Mean Target": round(target_ct_mean,2) if pd.notna(target_ct_mean) else None,
                 "Ct Mean ABL1": round(abl1_ct_mean,2) if pd.notna(abl1_ct_mean) else None,
                 "ΔCt (ABL1-Target)": round(delta_ct,2) if delta_ct is not None else None,
                 "Ratio (2^ΔCt)": round(ratio_ct,4),
-                "Aviso": aviso,
-                "Interpretación": interpretacion
+                "Aviso": aviso
             })
 
     summary_ct_df = pd.DataFrame(summary_ct_list).sort_values("Ratio (2^ΔCt)")
     st.subheader("Tabla Resumen basada en ΔCt")
     st.dataframe(summary_ct_df)
 
-    # Descargar Excel también para esta tabla
     towrite_ct = BytesIO()
     summary_ct_df.to_excel(towrite_ct, index=False, engine='openpyxl')
     towrite_ct.seek(0)
-    st.download_button(label="Descargar tabla ΔCt", data=towrite_ct, file_name="tabla_resumen_ct.xlsx", mime="application/vnd.ms-excel")
+    st.download_button("Descargar tabla ΔCt", towrite_ct, "tabla_resumen_ct.xlsx")
 
     # ==========================
     # Graficar curvas estándar
@@ -233,8 +225,7 @@ if uploaded_file:
     ax.legend()
     st.pyplot(fig)
 
-
-#Created by...
+# Footer
 st.markdown(
     """
     <div style='text-align: center; font-size: 12px;'>
