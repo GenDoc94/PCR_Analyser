@@ -3,12 +3,14 @@
 Este proyecto es una aplicación **Streamlit** para analizar datos de PCR cuantitativa, calcular ratios entre distintos **Target Names** y ABL1, y aplicar factores de conversión basados en las curvas estándar (`STANDARD`).
 
 La aplicación permite:  
-- Calcular ratios Target/ABL1 con multiplicador configurable (100 o 10000).  
+- Calcular ratios Target/ABL1 con multiplicador configurable (x100 o x10000).  
 - Aplicar **factores de conversión** correctos basados en los pares de Quantity de las curvas estándar.  
 - Generar interpretaciones MR según las reglas definidas.  
 - Avisar si solo hay 1/3 o 2/3 positivos en los pocillos.  
 - Mostrar gráficamente las rectas de regresión de las curvas estándar.  
 - Descargar una tabla resumen en Excel.
+
+Accede a la aplicación online en Heroku: [PCR Analyzer](https://pcranalysis-8902e0f940c1.herokuapp.com/)
 
 ---
 
@@ -77,7 +79,7 @@ streamlit run pcr_ratio_streamlit_final.py
 
 5. Se abrirá en el navegador una interfaz donde podrás:  
    - Subir tus archivos `.xls` de PCR.  
-   - Seleccionar multiplicador (100 o 10000).  
+   - Seleccionar multiplicador (x100 o x10000).  
    - Visualizar la tabla resumen y descargarla en Excel.  
    - Ver los gráficos de las curvas estándar con las rectas de regresión.
 
