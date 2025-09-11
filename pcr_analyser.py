@@ -31,58 +31,76 @@ if uploaded_file:
     # Calcular rectas de regresión y factores de conversión
     regression_dict = {}
     pair_factors_dict = {}
-    st.subheader("Rectas de regresión")
-    
-    for target in df_standard["Target Name"].unique():
-        t_df = df_standard[df_standard["Target Name"]==target]
-        grouped = t_df.groupby("Quantity")
-        x_vals, y_vals = [], []
-        pair_factors = []
-        
-        for qty, group in grouped:
-            ct_vals = group["Cт"].dropna().values
-            if len(ct_vals) == 0:
-                continue
-            elif len(ct_vals) == 1:
-                x_vals.append(np.log10(qty))
-                y_vals.append(ct_vals[0])
-                pair_factors.append({"Quantity": qty, "Ct_pair": ct_vals})
-            else:
-                x_vals.append(np.log10(qty))
-                y_vals.append(ct_vals.mean())
-                pair_factors.append({"Quantity": qty, "Ct_pair": ct_vals})
-        
-        if len(x_vals) > 1:
-            a, b = np.polyfit(x_vals, y_vals, 1)
-            regression_dict[target] = {"a": a, "b": b, "x_vals": x_vals, "y_vals": y_vals}
+
+    with st.expander("Rectas de regresión"):
+        for target in df_standard["Target Name"].unique():
+            t_df = df_standard[df_standard["Target Name"]==target]
+            grouped = t_df.groupby("Quantity")
+            x_vals, y_vals = [], []
+            pair_factors = []
             
-            for pf in pair_factors:
-                ct_pair = pf["Ct_pair"]
-                expected_qties = [10**((ct - b)/a) for ct in ct_pair]
-                pf["Factor"] = round(pf["Quantity"] / np.mean(expected_qties), 2)
-                pf.pop("Ct_pair")
-            pair_factors_dict[target] = pair_factors
-            st.write(f"{target}: Ct = {a:.3f}*log10(Quantity) + {b:.3f}")
-    
-    # ==========================
-    # NUEVO: mostrar factores de conversión en varias columnas
-    # ==========================
-    st.subheader("Factores de conversión")
-    targets = list(pair_factors_dict.keys())
-    for i in range(0, len(targets), 2):
-        cols = st.columns(2)
-        for j, col in enumerate(cols):
-            if i+j < len(targets):
-                target = targets[i+j]
-                pf_list = pair_factors_dict[target]
-                if pf_list:
-                    table = pd.DataFrame(pf_list)
-                    table = table.rename(columns={
-                        "Quantity": "Quantity (par)",
-                        "Factor": "Factor de Conversión"
-                    })
-                    col.markdown(f"**{target}**")
-                    col.dataframe(table)
+            for qty, group in grouped:
+                ct_vals = group["Cт"].dropna().values
+                if len(ct_vals) == 0:
+                    continue
+                elif len(ct_vals) == 1:
+                    x_vals.append(np.log10(qty))
+                    y_vals.append(ct_vals[0])
+                    pair_factors.append({"Quantity": qty, "Ct_pair": ct_vals})
+                else:
+                    x_vals.append(np.log10(qty))
+                    y_vals.append(ct_vals.mean())
+                    pair_factors.append({"Quantity": qty, "Ct_pair": ct_vals})
+            
+            if len(x_vals) > 1:
+                a, b = np.polyfit(x_vals, y_vals, 1)
+                regression_dict[target] = {
+                    "a": a, "b": b,
+                    "x_vals": x_vals, "y_vals": y_vals,
+                    "raw_points": t_df  # guardar los puntos originales
+                }
+                
+                for pf in pair_factors:
+                    ct_pair = pf["Ct_pair"]
+                    expected_qties = [10**((ct - b)/a) for ct in ct_pair]
+                    pf["Factor"] = round(pf["Quantity"] / np.mean(expected_qties), 2)
+                    pf.pop("Ct_pair")
+                pair_factors_dict[target] = pair_factors
+                st.write(f"{target}: Ct = {a:.3f}*log10(Quantity) + {b:.3f}")
+
+    with st.expander("Factores de conversión"):
+        targets = list(pair_factors_dict.keys())
+        for i in range(0, len(targets), 2):
+            cols = st.columns(2)
+            for j, col in enumerate(cols):
+                if i+j < len(targets):
+                    target = targets[i+j]
+                    pf_list = pair_factors_dict[target]
+                    if pf_list:
+                        table = pd.DataFrame(pf_list)
+                        table = table.rename(columns={
+                            "Quantity": "Quantity (par)",
+                            "Factor": "Factor de Conversión"
+                        })
+                        col.markdown(f"**{target}**")
+                        col.dataframe(table)
+
+    # Graficar curvas estándar
+    with st.expander("Curvas patrón de cada Target"):
+        fig, ax = plt.subplots(figsize=(8,6))
+        for target, reg in regression_dict.items():
+            x_plot = np.linspace(min(reg["x_vals"]), max(reg["x_vals"]), 100)
+            y_plot = reg["a"]*x_plot + reg["b"]
+            ax.plot(x_plot, y_plot, label=f"{target}")
+            
+            raw_points = reg["raw_points"]
+            ax.scatter(np.log10(raw_points["Quantity"]), raw_points["Cт"], s=10, alpha=0.7)
+        ax.set_xlabel("log10(Quantity)")
+        ax.set_ylabel("Ct")
+        ax.set_title("Curvas patrón de cada Target")
+        ax.legend()
+        st.pyplot(fig)
+
 
     # ==========================
     # TABLA 1: con Quantity
@@ -210,20 +228,7 @@ if uploaded_file:
     towrite_ct.seek(0)
     st.download_button("Descargar tabla ΔCt", towrite_ct, "tabla_resumen_ct.xlsx")
 
-    # ==========================
-    # Graficar curvas estándar
-    # ==========================
-    fig, ax = plt.subplots(figsize=(8,6))
-    for target, reg in regression_dict.items():
-        x_plot = np.linspace(min(reg["x_vals"]), max(reg["x_vals"]), 100)
-        y_plot = reg["a"]*x_plot + reg["b"]
-        ax.plot(x_plot, y_plot, label=f"{target} (fit)")
-        ax.scatter(reg["x_vals"], reg["y_vals"], s=50)
-    ax.set_xlabel("log10(Quantity)")
-    ax.set_ylabel("Ct")
-    ax.set_title("Curvas patrón de cada Target")
-    ax.legend()
-    st.pyplot(fig)
+
 
 # Footer
 st.markdown(
