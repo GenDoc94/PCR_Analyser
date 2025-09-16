@@ -18,16 +18,16 @@ multiplicador = st.selectbox("Multiplicar ratio por:", [100, 10000])
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file, skiprows=7)
-    
+
     # Pacientes reales
     df_patients = df[df["Task"]=="UNKNOWN"].copy()
     df_patients["Quantity Mean"] = pd.to_numeric(df_patients["Quantity Mean"], errors='coerce')
-    
+
     # Curvas estándar
     df_standard = df[df["Task"]=="STANDARD"].copy()
     df_standard["Quantity"] = pd.to_numeric(df_standard["Quantity"], errors='coerce')
     df_standard["Cт"] = pd.to_numeric(df_standard["Cт"], errors='coerce')
-    
+
     # Calcular rectas de regresión y factores de conversión
     regression_dict = {}
     pair_factors_dict = {}
@@ -38,9 +38,18 @@ if uploaded_file:
             grouped = t_df.groupby("Quantity")
             x_vals, y_vals = [], []
             pair_factors = []
-            
+
             for qty, group in grouped:
-                ct_vals = group["Cт"].dropna().values
+                ct_vals = group["Cт"].values
+                # Detectar Undetermined
+                n_undetermined = np.sum(pd.isna(ct_vals))
+                if n_undetermined > 0:
+                    if n_undetermined == 1:
+                        st.warning(f"{target}, Quantity {qty}: 1 Ct de 2 está 'Undetermined'")
+                    else:
+                        st.warning(f"{target}, Quantity {qty}: Ambos Ct están 'Undetermined'")
+                    ct_vals = [ct for ct in ct_vals if pd.notna(ct)]  # ignorar NaN
+
                 if len(ct_vals) == 0:
                     continue
                 elif len(ct_vals) == 1:
@@ -51,15 +60,15 @@ if uploaded_file:
                     x_vals.append(np.log10(qty))
                     y_vals.append(ct_vals.mean())
                     pair_factors.append({"Quantity": qty, "Ct_pair": ct_vals})
-            
+
             if len(x_vals) > 1:
                 a, b = np.polyfit(x_vals, y_vals, 1)
                 regression_dict[target] = {
                     "a": a, "b": b,
                     "x_vals": x_vals, "y_vals": y_vals,
-                    "raw_points": t_df  # guardar los puntos originales
+                    "raw_points": t_df
                 }
-                
+
                 for pf in pair_factors:
                     ct_pair = pf["Ct_pair"]
                     expected_qties = [10**((ct - b)/a) for ct in ct_pair]
@@ -85,14 +94,13 @@ if uploaded_file:
                         col.markdown(f"**{target}**")
                         col.dataframe(table)
 
-    # Graficar curvas estándar
     with st.expander("Curvas patrón de cada Target"):
         fig, ax = plt.subplots(figsize=(8,6))
         for target, reg in regression_dict.items():
             x_plot = np.linspace(min(reg["x_vals"]), max(reg["x_vals"]), 100)
             y_plot = reg["a"]*x_plot + reg["b"]
             ax.plot(x_plot, y_plot, label=f"{target}")
-            
+
             raw_points = reg["raw_points"]
             ax.scatter(np.log10(raw_points["Quantity"]), raw_points["Cт"], s=10, alpha=0.7)
         ax.set_xlabel("log10(Quantity)")
@@ -100,7 +108,6 @@ if uploaded_file:
         ax.set_title("Curvas patrón de cada Target")
         ax.legend()
         st.pyplot(fig)
-
 
     # ==========================
     # TABLA 1: con Quantity
@@ -110,23 +117,23 @@ if uploaded_file:
         patient_df = df_patients[df_patients["Sample Name"]==patient]
         abl1_mean = patient_df[patient_df["Target Name"]=="ABL1"]["Quantity Mean"].mean()
         targets = [t for t in patient_df["Target Name"].unique() if t!="ABL1"]
-        
+
         for target in targets:
             target_df = patient_df[patient_df["Target Name"]==target]
             quantity_mean = target_df["Quantity Mean"].mean()
             n_positive = target_df["Quantity"].notna().sum()
-            
+
             if n_positive == 1:
                 aviso, extra = "Sólo 1/3 positivo", "Repetir"
             elif n_positive == 2:
                 aviso, extra = "Sólo 2/3 positivo", ""
             else:
                 aviso, extra = "", ""
-            
+
             ratio, fc = 0.0, 1.0
             if quantity_mean>0 and abl1_mean>0:
                 ratio = (quantity_mean / abl1_mean) * multiplicador
-            
+
             if ratio>0 and target in pair_factors_dict:
                 pf_list = pair_factors_dict[target]
                 log_q_patient = np.log10(quantity_mean)
@@ -134,7 +141,7 @@ if uploaded_file:
                 idx = np.argmin(diffs)
                 fc = pf_list[idx]["Factor"]
                 ratio *= fc
-            
+
             if abl1_mean<10000:
                 interpretacion = "No valorable"
             elif ratio==0:
@@ -148,7 +155,7 @@ if uploaded_file:
                 elif 0.001<ratio<=0.0032: interpretacion="MR4.5"
                 else: interpretacion="MR5"
             if extra: interpretacion += f" ({extra})"
-            
+
             summary_list.append({
                 "Interpretación": interpretacion,
                 "Paciente": patient,
@@ -159,16 +166,16 @@ if uploaded_file:
                 "FC": round(fc,2),
                 "Aviso": aviso
             })
-    
+
     summary_df = pd.DataFrame(summary_list).sort_values("Ratio")
     st.subheader("Tabla Resumen (Quantity/ABL1)")
     st.dataframe(summary_df)
-    
+
     towrite = BytesIO()
     summary_df.to_excel(towrite, index=False, engine='openpyxl')
     towrite.seek(0)
     st.download_button("Descargar tabla resumen", towrite, "tabla_resumen_final.xlsx")
-    
+
     # ==========================
     # TABLA 2: con ΔCt
     # ==========================
@@ -188,12 +195,12 @@ if uploaded_file:
                 aviso, extra = "Sólo 1/3 positivo", "Repetir"
             elif n_positive == 2:
                 aviso, extra = "Sólo 2/3 positivo", ""
-            
+
             ratio_ct, delta_ct = 0.0, None
             if pd.notna(abl1_ct_mean) and pd.notna(target_ct_mean):
                 delta_ct = abl1_ct_mean - target_ct_mean
                 ratio_ct = (2 ** delta_ct) * multiplicador
-            
+
             if abl1_mean < 10000:
                 interpretacion = "No valorable"
             elif ratio_ct==0:
@@ -227,8 +234,6 @@ if uploaded_file:
     summary_ct_df.to_excel(towrite_ct, index=False, engine='openpyxl')
     towrite_ct.seek(0)
     st.download_button("Descargar tabla ΔCt", towrite_ct, "tabla_resumen_ct.xlsx")
-
-
 
 # Footer
 st.markdown(
